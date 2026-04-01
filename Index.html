@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QUESTLOAD — browser check</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #080a0c;
+      --surface:  #0d1117;
+      --border:   #1c2433;
+      --cyan:     #00e5ff;
+      --green:    #00ff88;
+      --amber:    #ffb300;
+      --red:      #ff3d57;
+      --dim:      #3a4a5c;
+      --text:     #c8d8e8;
+      --muted:    #5a6a7a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* scanlines overlay (preserved) */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,229,255,0.015) 2px,
+        rgba(0,229,255,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── full app container (hidden until browser check passes) ── */
+    #app {
+      display: none;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    /* ── unsupported message container (visible by default) ── */
+    #unsupported-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .unsupported-card {
+      max-width: 640px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 36px 32px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      text-align: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .unsupported-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      display: inline-block;
+      filter: drop-shadow(0 0 6px rgba(255,61,87,0.4));
+    }
+
+    .unsupported-card h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--red);
+      letter-spacing: -0.01em;
+      margin-bottom: 12px;
+    }
+
+    .unsupported-card p {
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+      margin: 12px 0;
+    }
+
+    .unsupported-card .req-list {
+      text-align: left;
+      background: rgba(0,0,0,0.4);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-left: 3px solid var(--cyan);
+    }
+
+    .req-list li {
+      list-style: none;
+      margin: 10px 0;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .req-list li::before {
+      content: "▸";
+      color: var(--cyan);
+      font-size: 14px;
+    }
+
+    .badge-browser {
+      display: inline-flex;
+      gap: 12px;
+      justify-content: center;
+      margin: 16px 0 8px;
+    }
+
+    .browser-badge {
+      background: rgba(0,229,255,0.1);
+      padding: 6px 16px;
+      border-radius: 40px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid rgba(0,229,255,0.3);
+      color: var(--cyan);
+    }
+
+    .btn-refresh {
+      background: transparent;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      padding: 8px 20px;
+      border-radius: 60px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      transition: 0.15s;
+      margin-top: 8px;
+    }
+
+    .btn-refresh:hover {
+      background: rgba(0,229,255,0.12);
+      box-shadow: 0 0 12px rgba(0,229,255,0.2);
+    }
+
+    /* original app styles (unchanged but scoped inside #app) */
+    #app header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(13,17,23,0.9);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    #app .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: 0.12em;
+      color: var(--cyan);
+      text-shadow: 0 0 20px rgba(0,229,255,0.4);
+    }
+
+    #app .logo span { color: var(--green); }
+
+    #app .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    #app .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--dim);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    #app .status-dot.connected {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    #app .status-dot.connecting {
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+      animation: pulse 0.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #app main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto auto;
+      gap: 16px;
+      padding: 24px 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    #app .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 22px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    #app .card:hover { border-color: #2a3a4f; }
+
+    #app .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0.3;
+    }
+
+    #app .card.connect-card { grid-column: 1 / -1; }
+    #app .card.console-card { grid-column: 1 / -1; }
+
+    #app .card-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    #app .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    #app .card-sub {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    #app .connect-inner {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    #app .connect-info { flex: 1; }
+
+    #app .device-name {
+      font-size: 15px;
+      color: var(--green);
+      margin-top: 4px;
+      min-height: 20px;
+    }
+
+    #app .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 5px;
+      border: 1px solid;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    #app .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    #app .btn-cyan {
+      background: rgba(0,229,255,0.08);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    #app .btn-cyan:not(:disabled):hover {
+      background: rgba(0,229,255,0.16);
+      box-shadow: 0 0 16px rgba(0,229,255,0.2);
+    }
+
+    #app .btn-green {
+      background: rgba(0,255,136,0.08);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    #app .btn-green:not(:disabled):hover {
+      background: rgba(0,255,136,0.16);
+      box-shadow: 0 0 16px rgba(0,255,136,0.2);
+    }
+
+    #app .btn-red {
+      background: rgba(255,61,87,0.08);
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    #app .btn-red:not(:disabled):hover {
+      background: rgba(255,61,87,0.16);
+    }
+
+    #app .btn-full { width: 100%; justify-content: center; }
+
+    #app .dropzone {
+      border: 1px dashed var(--dim);
+      border-radius: 6px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: rgba(255,255,255,0.01);
+      position: relative;
+    }
+
+    #app .dropzone:hover, #app .dropzone.drag-over {
+      border-color: var(--cyan);
+      background: rgba(0,229,255,0.04);
+    }
+
+    #app .dropzone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    #app .dropzone-icon {
+      font-size: 28px;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    #app .dropzone-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    #app .dropzone-hint {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    #app .file-selected {
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: rgba(0,229,255,0.06);
+      border: 1px solid rgba(0,229,255,0.2);
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--cyan);
+      word-break: break-all;
+    }
+
+    #app .progress-wrap {
+      margin-top: 14px;
+      display: none;
+    }
+
+    #app .progress-wrap.visible { display: block; }
+
+    #app .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    #app .progress-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    #app .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+      box-shadow: 0 0 8px rgba(0,229,255,0.4);
+    }
+
+    #app .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    #app .field-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    #app .field-input {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    #app .field-input:focus {
+      border-color: var(--cyan);
+    }
+
+    #app .field-input::placeholder { color: var(--dim); }
+
+    #app .console {
+      background: #060809;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      font-size: 12px;
+      line-height: 1.7;
+      height: 240px;
+      overflow-y: auto;
+      font-family: 'Space Mono', monospace;
+    }
+
+    #app .console::-webkit-scrollbar { width: 6px; }
+    #app .console::-webkit-scrollbar-track { background: transparent; }
+    #app .console::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    #app .log-line { display: flex; gap: 10px; }
+    #app .log-ts { color: var(--dim); flex-shrink: 0; }
+    #app .log-info { color: var(--text); }
+    #app .log-success { color: var(--green); }
+    #app .log-warn { color: var(--amber); }
+    #app .log-error { color: var(--red); }
+
+    #app .console-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    #app .prereqs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    #app .prereq {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    #app .prereq-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--cyan);
+      opacity: 0.5;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    #app .prereq-text {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    #app .prereq-text strong { color: var(--text); }
+
+    #app .action-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    #app .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      font-family: 'Syne', sans-serif;
+    }
+
+    #app .badge-cyan { background: rgba(0,229,255,0.12); color: var(--cyan); }
+    #app .badge-green { background: rgba(0,255,136,0.12); color: var(--green); }
+    #app .badge-red { background: rgba(255,61,87,0.12); color: var(--red); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- unsupported message (shown by default) -->
+  <div id="unsupported-container">
+    <div class="unsupported-card">
+      <div class="unsupported-icon">⚠️</div>
+      <h2>BROWSER NOT SUPPORTED</h2>
+      <p><strong>QUESTLOAD</strong> requires advanced USB access (WebUSB) and a secure context.</p>
+      <div class="req-list">
+        <li>WebUSB API support (Chrome / Edge / Chromium-based)</li>
+        <li>HTTPS or localhost (secure context)</li>
+        <li>Developer mode enabled on your Quest headset</li>
+      </div>
+      <div class="badge-browser">
+        <span class="browser-badge">✓ Google Chrome</span>
+        <span class="browser-badge">✓ Microsoft Edge</span>
+        <span class="browser-badge">✗ Firefox</span>
+        <span class="browser-badge">✗ Safari</span>
+      </div>
+      <p style="font-size:12px; margin-top:12px">Firefox and Safari do not implement WebUSB. <br>Please switch to <strong>Chrome, Edge, Brave, or Opera</strong> to sideload APK/OBB files directly.</p>
+      <button class="btn-refresh" id="retryBrowserBtn">⟳ TRY AGAIN (if browser changed)</button>
+    </div>
+  </div>
+
+  <!-- full application (hidden until browser validation) -->
+  <div id="app">
+    <header>
+      <div class="logo">QUEST<span>LOAD</span></div>
+      <div class="status-bar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">NOT CONNECTED</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- CONNECT CARD -->
+      <div class="card connect-card">
+        <div class="card-label">01 / Device</div>
+        <div class="connect-inner">
+          <div class="connect-info">
+            <div class="card-title">Connect Your Headset</div>
+            <div class="card-sub">Connect your Quest via USB. Uses WebUSB + ADB — no drivers, no software needed.<br>
+              Put the headset on after connecting and accept the <em>"Allow USB Debugging"</em> prompt.</div>
+            <div class="device-name" id="deviceName">—</div>
+          </div>
+          <div style="display:flex;gap:10px;flex-shrink:0">
+            <button class="btn btn-cyan" id="btnConnect" onclick="connectDevice()">
+              <span>⬡</span> Connect Device
+            </button>
+            <button class="btn btn-red" id="btnDisconnect" onclick="disconnectDevice()" disabled>
+              Disconnect
+            </button>
+          </div>
+        </div>
+        <div class="prereqs">
+          <div class="prereq"><span class="prereq-num">01</span><div class="prereq-text"><strong>Developer Mode</strong> — enable in the Meta app on your phone under headset settings → developer mode</div></div>
+          <div class="prereq"><span class="prereq-num">02</span><div class="prereq-text"><strong>USB Cable</strong> — plug headset into PC/Mac. Use a data cable, not charge-only</div></div>
+          <div class="prereq"><span class="prereq-num">03</span><div class="prereq-text"><strong>Allow Debugging</strong> — put headset on and tap <em>Allow</em> on the USB debugging prompt</div></div>
+        </div>
+      </div>
+
+      <!-- APK INSTALL -->
+      <div class="card">
+        <div class="card-label">02 / APK Install</div>
+        <div class="card-title">Install APK</div>
+        <div class="card-sub">Select a .apk file. It will be pushed to the device and installed automatically.</div>
+        <div class="dropzone" id="apkDrop">
+          <input type="file" id="apkFile" accept=".apk" onchange="handleApkSelect(this)">
+          <span class="dropzone-icon">📦</span>
+          <div class="dropzone-title">Drop APK here</div>
+          <div class="dropzone-hint">or click to browse — .apk files only</div>
+        </div>
+        <div class="file-selected" id="apkName" style="display:none"></div>
+        <div class="progress-wrap" id="apkProgress">
+          <div class="progress-label">
+            <span id="apkProgressLabel">Pushing…</span>
+            <span id="apkProgressPct">0%</span>
+          </div>
+          <div class="progress-track"><div class="progress-bar" id="apkProgressBar"></div></div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-green btn-full" id="btnInstall" onclick="installApk()" disabled>
+            ▶ Install APK
+          </button>
+        </div>
+      </div>
+
+      <!-- OBB PUSH -->
+      <div class="card">
+        <div class="card-label">03 / OBB Files</div>
+        <div class="card-title">Push OBB Folder</div>
+        <div class="card-sub">Select the OBB folder for your game. Files will be pushed to <code>/sdcard/Android/obb/</code></div>
+        <div class="field-row">
+          <label class="field-label">DESTINATION PATH (auto-detected or edit manually)</label>
+          <input class="field-input" type="text" id="obbPath"
+            placeholder="/sdcard/Android/obb/com.yourapp.name/" value="/sdcard/Android/obb/">
+        </div>
+        <div class="dropzone" id="obbDrop">
+          <input type="file" id="obbFolder" webkitdirectory multiple onchange="handleObbSelect(this)">
+          <span class="dropzone-icon">📁</span>
+          <div class="dropzone-title">Select OBB folder</div>
+          <div class="dropzone-hint">Click to choose folder — entire directory is pushed</div>
+        </div>
+        <div class="file-selected" id="obbInfo" style="display:none"></div>
+        <div class="progress-wrap" id="obbProgress">
+          <div class="progress-label">
+            <span id="obbProgressLabel">Pushing…</span>
+            <span id="obbProgressPct">0%</span>
+          </div>
+          <div class="progress-track"><div class="progress-bar" id="obbProgressBar"></div></div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-green btn-full" id="btnPushObb" onclick="pushObb()" disabled>
+            ▶ Push OBB Files
+          </button>
+        </div>
+      </div>
+
+      <!-- CONSOLE -->
+      <div class="card console-card">
+        <div class="console-header">
+          <div class="card-label" style="margin:0">Console Output</div>
+          <button class="btn btn-red" style="padding:4px 12px;font-size:11px" onclick="clearConsole()">Clear</button>
+        </div>
+        <div class="console" id="console"></div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    // ─────────────────────────────────────────────────────────────────
+    // BROWSER SUPPORT CHECK: WebUSB + Secure Context
+    // ─────────────────────────────────────────────────────────────────
+    const unsupportedDiv = document.getElementById('unsupported-container');
+    const appContainer = document.getElementById('app');
+
+    function isBrowserSupported() {
+      // WebUSB mandatory + secure context (HTTPS or localhost)
+      return 'usb' in navigator && window.isSecureContext === true;
+    }
+
+    function showUnsupported() {
+      if (unsupportedDiv) unsupportedDiv.style.display = 'flex';
+      if (appContainer) appContainer.style.display = 'none';
+    }
+
+    function showApp() {
+      if (unsupportedDiv) unsupportedDiv.style.display = 'none';
+      if (appContainer) appContainer.style.display = 'block';
+      // additional tiny log to indicate ready
+      const consoleEl = document.getElementById('console');
+      if (consoleEl) {
+        const logLine = document.createElement('div');
+        logLine.className = 'log-line';
+        logLine.innerHTML = `<span class="log-ts">${new Date().toLocaleTimeString('en', { hour12: false })}</span><span class="log-success">✓ Browser supported — WebUSB ready. Connect your headset.</span>`;
+        consoleEl.appendChild(logLine);
+      }
+    }
+
+    // retry button logic
+    const retryBtn = document.getElementById('retryBrowserBtn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        if (isBrowserSupported()) {
+          showApp();
+        } else {
+          // keep unsupported visible, maybe show temporary note
+          const note = document.createElement('p');
+          note.style.color = '#ffb300';
+          note.style.fontSize = '12px';
+          note.style.marginTop = '12px';
+          note.innerText = '❌ WebUSB still missing. Use Chrome/Edge or ensure HTTPS/localhost.';
+          document.querySelector('.unsupported-card').appendChild(note);
+          setTimeout(() => note.remove(), 3000);
+        }
+      });
+    }
+
+    // initial check
+    if (isBrowserSupported()) {
+      showApp();
+    } else {
+      showUnsupported();
+      // also add additional hint if secure context fails
+      if (!window.isSecureContext) {
+        const extraMsg = document.createElement('p');
+        extraMsg.style.marginTop = '8px';
+        extraMsg.style.fontSize = '11px';
+        extraMsg.style.color = '#ffb300';
+        extraMsg.innerHTML = '🔒 Not a secure context — load over HTTPS or localhost.';
+        document.querySelector('.unsupported-card .req-list').after(extraMsg);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  FULL QUESTLOAD LOGIC (imports & handlers)
+    // ─────────────────────────────────────────────────────────────────
+    import { Adb } from 'https://esm.sh/@yume-chan/adb@0.0.24';
+    import { AdbWebUsbBackend } from 'https://esm.sh/@yume-chan/adb-backend-webusb@0.0.24';
+    import { AdbWebCredentialStore } from 'https://esm.sh/@yume-chan/adb-credential-web-crypto@0.0.24';
+
+    let adb = null;
+    let apkFile = null;
+    let obbFiles = [];
+
+    window.connectDevice = connectDevice;
+    window.disconnectDevice = disconnectDevice;
+    window.installApk = installApk;
+    window.pushObb = pushObb;
+    window.handleApkSelect = handleApkSelect;
+    window.handleObbSelect = handleObbSelect;
+    window.clearConsole = clearConsole;
+
+    function log(msg, type = 'info') {
+      const el = document.getElementById('console');
+      if (!el) return;
+      const ts = new Date().toLocaleTimeString('en', { hour12: false });
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${escapeHtml(msg)}</span>`;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function clearConsole() { const c = document.getElementById('console'); if(c) c.innerHTML = ''; }
+
+    function setStatus(state, text, deviceLabel = '') {
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      const name = document.getElementById('deviceName');
+      if(dot) dot.className = `status-dot ${state}`;
+      if(txt) txt.textContent = text;
+      if(name) name.textContent = deviceLabel || '—';
+    }
+
+    function setConnected(connected) {
+      const btnConnect = document.getElementById('btnConnect');
+      const btnDisconnect = document.getElementById('btnDisconnect');
+      if(btnConnect) btnConnect.disabled = connected;
+      if(btnDisconnect) btnDisconnect.disabled = !connected;
+      updateInstallBtns();
+    }
+
+    function updateInstallBtns() {
+      const ok = !!adb;
+      const btnInstall = document.getElementById('btnInstall');
+      const btnPush = document.getElementById('btnPushObb');
+      if(btnInstall) btnInstall.disabled = !ok || !apkFile;
+      if(btnPush) btnPush.disabled = !ok || obbFiles.length === 0;
+    }
+
+    function handleApkSelect(input) {
+      const f = input.files[0];
+      if (!f) return;
+      if (!f.name.endsWith('.apk')) { log('Selected file is not an APK', 'error'); return; }
+      apkFile = f;
+      const el = document.getElementById('apkName');
+      if(el) { el.style.display = 'block'; el.textContent = `${f.name}  (${formatBytes(f.size)})`; }
+      log(`APK selected: ${f.name} (${formatBytes(f.size)})`, 'info');
+      updateInstallBtns();
+    }
+
+    function handleObbSelect(input) {
+      obbFiles = Array.from(input.files);
+      if (!obbFiles.length) return;
+      const firstObb = obbFiles.find(f => f.name.endsWith('.obb'));
+      if (firstObb) {
+        const parts = firstObb.name.split('.');
+        if (parts.length >= 4) {
+          const pkg = parts.slice(2, -1).join('.');
+          const pathInput = document.getElementById('obbPath');
+          if (pathInput && pathInput.value === '/sdcard/Android/obb/') {
+            pathInput.value = `/sdcard/Android/obb/${pkg}/`;
+            log(`Auto-detected package: ${pkg}`, 'info');
+          }
+        }
+      }
+      const totalSize = obbFiles.reduce((s, f) => s + f.size, 0);
+      const infoEl = document.getElementById('obbInfo');
+      if(infoEl) { infoEl.style.display = 'block'; infoEl.textContent = `${obbFiles.length} file(s) — ${formatBytes(totalSize)}`; }
+      log(`OBB folder selected: ${obbFiles.length} file(s), ${formatBytes(totalSize)}`, 'info');
+      updateInstallBtns();
+    }
+
+    async function connectDevice() {
+      if (!navigator.usb) { log('WebUSB not supported', 'error'); return; }
+      try {
+        setStatus('connecting', 'CONNECTING…');
+        log('Requesting USB device…');
+        const credentialStore = new AdbWebCredentialStore('QuestLoad');
+        const backend = await AdbWebUsbBackend.fromBrowser(undefined);
+        log('USB device selected. Connecting ADB…');
+        adb = new Adb(backend, 'QuestLoad', credentialStore);
+        await adb.connect();
+        const serial = adb.serial || 'quest';
+        setStatus('connected', 'CONNECTED', serial);
+        log(`Connected: ${serial}`, 'success');
+        try {
+          const model = await shellCommand('getprop ro.product.model');
+          log(`Device: ${model.trim()}`, 'success');
+        } catch {}
+        setConnected(true);
+      } catch (err) {
+        adb = null;
+        setStatus('', 'NOT CONNECTED');
+        log(`Connection failed: ${err.message || err}`, 'error');
+        log('Tip: Put on the headset and accept the USB debugging prompt', 'warn');
+        setConnected(false);
+      }
+    }
+
+    async function disconnectDevice() {
+      if (adb) { try { await adb.close(); } catch {} adb = null; }
+      setStatus('', 'NOT CONNECTED', '');
+      setConnected(false);
+      log('Disconnected', 'warn');
+    }
+
+    async function shellCommand(cmd) {
+      if (!adb) throw new Error('Not connected');
+      const output = await adb.subprocess.shell(cmd);
+      const reader = output.stdout.getReader();
+      let result = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        result += new TextDecoder().decode(value);
+      }
+      return result;
+    }
+
+    async function pushFileToDevice(file, remotePath, onProgress) {
+      const CHUNK = 64 * 1024;
+      const sync = await adb.sync();
+      try {
+        const mtime = Math.floor(Date.now() / 1000);
+        const writable = sync.write(remotePath, 0o644, mtime);
+        const writer = writable.getWriter();
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let offset = 0;
+        const total = bytes.length;
+        while (offset < total) {
+          const end = Math.min(offset + CHUNK, total);
+          const chunk = bytes.subarray(offset, end);
+          await writer.write(chunk);
+          offset = end;
+          if (onProgress) onProgress(offset, total);
+        }
+        await writer.close();
+      } finally {
+        await sync.dispose();
+      }
+    }
+
+    async function installApk() {
+      if (!adb || !apkFile) return;
+      const btn = document.getElementById('btnInstall');
+      if(btn) btn.disabled = true;
+      const progressWrap = document.getElementById('apkProgress');
+      const progressBar = document.getElementById('apkProgressBar');
+      const progressPct = document.getElementById('apkProgressPct');
+      const progressLbl = document.getElementById('apkProgressLabel');
+      const tmpPath = '/data/local/tmp/_questload_install.apk';
+      try {
+        if(progressWrap) progressWrap.classList.add('visible');
+        if(progressLbl) progressLbl.textContent = 'Pushing APK…';
+        await pushFileToDevice(apkFile, tmpPath, (done, total) => {
+          const pct = Math.round((done / total) * 100);
+          if(progressBar) progressBar.style.width = pct + '%';
+          if(progressPct) progressPct.textContent = pct + '%';
+        });
+        if(progressLbl) progressLbl.textContent = 'Installing…';
+        if(progressBar) progressBar.style.width = '100%';
+        const result = await shellCommand(`pm install -r "${tmpPath}"`);
+        log(`pm install: ${result.trim()}`, result.includes('Success') ? 'success' : 'error');
+        await shellCommand(`rm "${tmpPath}"`);
+        if (result.includes('Success')) log('✓ APK installed successfully!', 'success');
+        else log('Installation may have failed — check output above', 'warn');
+      } catch (err) {
+        log(`Install error: ${err.message || err}`, 'error');
+      } finally {
+        if(btn) btn.disabled = false;
+        setTimeout(() => { if(progressWrap) progressWrap.classList.remove('visible'); }, 3000);
+        updateInstallBtns();
+      }
+    }
+
+    async function pushObb() {
+      if (!adb || !obbFiles.length) return;
+      const btn = document.getElementById('btnPushObb');
+      if(btn) btn.disabled = true;
+      const destBase = document.getElementById('obbPath').value.replace(/\/?$/, '/');
+      const progressWrap = document.getElementById('obbProgress');
+      const progressBar = document.getElementById('obbProgressBar');
+      const progressPct = document.getElementById('obbProgressPct');
+      const progressLbl = document.getElementById('obbProgressLabel');
+      if(progressWrap) progressWrap.classList.add('visible');
+      try {
+        await shellCommand(`mkdir -p "${destBase}"`);
+        const total = obbFiles.length;
+        let done = 0;
+        for (const file of obbFiles) {
+          const rel = file.webkitRelativePath || file.name;
+          const parts = rel.split('/');
+          const subPath = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+          const remotePath = destBase + subPath;
+          if (subPath.includes('/')) {
+            const dir = remotePath.substring(0, remotePath.lastIndexOf('/'));
+            await shellCommand(`mkdir -p "${dir}"`);
+          }
+          log(`Pushing [${done+1}/${total}] ${subPath} (${formatBytes(file.size)})`);
+          if(progressLbl) progressLbl.textContent = `Pushing ${subPath}…`;
+          await pushFileToDevice(file, remotePath, (sent, fileTotal) => {
+            const filePct = sent / fileTotal;
+            const overall = ((done + filePct) / total) * 100;
+            if(progressBar) progressBar.style.width = Math.round(overall) + '%';
+            if(progressPct) progressPct.textContent = Math.round(overall) + '%';
+          });
+          done++;
+          log(`✓ ${subPath}`, 'success');
+        }
+        log(`✓ All ${total} OBB file(s) pushed to ${destBase}`, 'success');
+      } catch (err) {
+        log(`OBB push error: ${err.message || err}`, 'error');
+      } finally {
+        if(btn) btn.disabled = false;
+        setTimeout(() => { if(progressWrap) progressWrap.classList.remove('visible'); }, 3000);
+        updateInstallBtns();
+      }
+    }
+
+    function formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+      if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+      return (b / 1073741824).toFixed(2) + ' GB';
+    }
+
+    document.querySelectorAll('.dropzone').forEach(dz => {
+      dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+      dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+      dz.addEventListener('drop', () => dz.classList.remove('drag-over'));
+    });
+
+    if (isBrowserSupported()) log('QuestLoad ready. Connect your headset to begin.', 'info');
+  </script>
+</body>
+</html>
