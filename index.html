@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    /* (styles unchanged from previous version, but we keep them concise) */
+    /* All styles remain exactly as before (no changes needed) */
     :root {
       --bg:       #080a0c;
       --surface:  #0d1117;
@@ -155,7 +155,7 @@
       box-shadow: 0 0 12px rgba(0,229,255,0.2);
     }
 
-    /* App styles (same as before, but scoped under #app) */
+    /* App styles (unchanged) */
     #app header {
       display: flex;
       align-items: center;
@@ -671,10 +671,9 @@
 
   if (!isBrowserSupported()) {
     showUnsupported();
-    // Add retry button handler
     document.getElementById('retryBrowserBtn').addEventListener('click', () => {
       if (isBrowserSupported()) {
-        location.reload(); // reload to re-run script
+        location.reload();
       } else {
         const note = document.createElement('p');
         note.style.color = '#ffb300';
@@ -685,40 +684,52 @@
         setTimeout(() => note.remove(), 3000);
       }
     });
-    throw new Error('Browser not supported'); // stop execution
+    throw new Error('Browser not supported');
   } else {
-    // browser supports WebUSB → try to load modules and show app
-    showApp(); // show empty app first (might show loading later)
+    // browser passes basic checks, now try to load the ADB libraries
+    showApp(); // show empty app first (will hide if imports fail)
   }
 
   // ------------------------------------------------------------------
-  // 2. Dynamically import ADB modules (to catch failures)
+  // 2. Dynamically import ADB modules (with fallback CDN)
   // ------------------------------------------------------------------
   let Adb, AdbWebUsbBackend, AdbWebCredentialStore;
+
   try {
-    const adbModule = await import('https://esm.sh/@yume-chan/adb@0.0.24');
-    const backendModule = await import('https://esm.sh/@yume-chan/adb-backend-webusb@0.0.24');
-    const credModule = await import('https://esm.sh/@yume-chan/adb-credential-web-crypto@0.0.24');
+    // Use jsdelivr with explicit version 0.1.0 (more stable than esm.sh)
+    const adbModule = await import('https://cdn.jsdelivr.net/npm/@yume-chan/adb@0.1.0/+esm');
+    const backendModule = await import('https://cdn.jsdelivr.net/npm/@yume-chan/adb-backend-webusb@0.1.0/+esm');
+    const credModule = await import('https://cdn.jsdelivr.net/npm/@yume-chan/adb-credential-web-crypto@0.1.0/+esm');
+
     Adb = adbModule.Adb;
     AdbWebUsbBackend = backendModule.AdbWebUsbBackend;
     AdbWebCredentialStore = credModule.AdbWebCredentialStore;
+
+    console.log('ADB libraries loaded successfully');
   } catch (importError) {
     console.error('Failed to load ADB modules:', importError);
-    // Show error inside unsupported container and hide app
+    // Show detailed error in unsupported card and hide app
     const errorCard = document.querySelector('.unsupported-card');
-    errorCard.innerHTML += `<p style="color:#ff3d57; margin-top:16px;">⚠️ Failed to load core libraries. Check your internet connection and reload.</p>`;
+    const errorMsg = document.createElement('div');
+    errorMsg.style.marginTop = '20px';
+    errorMsg.style.padding = '12px';
+    errorMsg.style.background = 'rgba(255,61,87,0.1)';
+    errorMsg.style.borderRadius = '8px';
+    errorMsg.style.fontSize = '12px';
+    errorMsg.style.color = '#ff8a8a';
+    errorMsg.innerHTML = `<strong>⚠️ Library load error:</strong><br>${importError.message}<br><br>Try refreshing or check your internet connection. If the problem persists, try using a different Chromium-based browser (Chrome, Edge).`;
+    errorCard.appendChild(errorMsg);
     showUnsupported();
     throw importError;
   }
 
   // ------------------------------------------------------------------
-  // 3. Application state and logic
+  // 3. Application state and logic (unchanged from working version)
   // ------------------------------------------------------------------
   let adb = null;
   let apkFile = null;
   let obbFiles = [];
 
-  // Helper: log to console
   function log(msg, type = 'info') {
     const el = document.getElementById('console');
     if (!el) return;
@@ -756,7 +767,6 @@
     if (pushBtn) pushBtn.disabled = !connected || obbFiles.length === 0;
   }
 
-  // File handlers
   function handleApkSelect(file) {
     if (!file) return;
     if (!file.name.endsWith('.apk')) {
@@ -775,7 +785,6 @@
     obbFiles = Array.from(files);
     if (!obbFiles.length) return;
 
-    // auto-detect package from first .obb file
     const firstObb = obbFiles.find(f => f.name.endsWith('.obb'));
     if (firstObb) {
       const parts = firstObb.name.split('.');
@@ -797,7 +806,6 @@
     updateInstallBtns();
   }
 
-  // ADB operations
   async function connectDevice() {
     if (!navigator.usb) {
       log('WebUSB not supported', 'error');
@@ -974,20 +982,18 @@
   // ------------------------------------------------------------------
   // 4. Attach event listeners and initialize UI
   // ------------------------------------------------------------------
-  // Buttons
   document.getElementById('btnConnect').addEventListener('click', connectDevice);
   document.getElementById('btnDisconnect').addEventListener('click', disconnectDevice);
   document.getElementById('btnInstall').addEventListener('click', installApk);
   document.getElementById('btnPushObb').addEventListener('click', pushObb);
   document.getElementById('clearConsoleBtn').addEventListener('click', clearConsole);
 
-  // File inputs
   const apkInput = document.getElementById('apkFile');
   apkInput.addEventListener('change', (e) => handleApkSelect(e.target.files[0]));
   const obbInput = document.getElementById('obbFolder');
   obbInput.addEventListener('change', (e) => handleObbSelect(e.target.files));
 
-  // Drag & drop zones (optional enhancements)
+  // Drag & drop enhancements
   const apkDropZone = document.getElementById('apkDrop');
   apkDropZone.addEventListener('dragover', (e) => e.preventDefault());
   apkDropZone.addEventListener('dragleave', () => apkDropZone.classList.remove('drag-over'));
@@ -998,7 +1004,6 @@
     const file = e.dataTransfer.files[0];
     if (file && file.name.endsWith('.apk')) {
       handleApkSelect(file);
-      // Also update the input's file list for consistency
       const dt = new DataTransfer();
       dt.items.add(file);
       apkInput.files = dt.files;
@@ -1017,14 +1022,11 @@
     const files = Array.from(e.dataTransfer.files);
     if (files.length) {
       handleObbSelect(files);
-      // manually set input's files (webkitdirectory can't be set via DataTransfer, but user can still browse)
-      // we just update the UI
     } else {
       log('No files dropped', 'warn');
     }
   });
 
-  // initial log
   log('QuestLoad ready. Connect your headset to begin.', 'info');
   log('Browser is supported (WebUSB + secure context).', 'success');
 </script>
