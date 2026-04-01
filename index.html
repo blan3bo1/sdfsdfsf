@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QUESTLOAD — browser check</title>
+  <title>QUESTLOAD</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
+    /* (styles unchanged from previous version, but we keep them concise) */
     :root {
       --bg:       #080a0c;
       --surface:  #0d1117;
@@ -32,7 +33,6 @@
       position: relative;
     }
 
-    /* scanlines overlay (preserved) */
     body::before {
       content: '';
       position: fixed;
@@ -48,13 +48,11 @@
       z-index: 9999;
     }
 
-    /* ── full app container (hidden until browser check passes) ── */
     #app {
       display: none;
       animation: fadeIn 0.25s ease-out;
     }
 
-    /* ── unsupported message container (visible by default) ── */
     #unsupported-container {
       display: flex;
       align-items: center;
@@ -97,7 +95,7 @@
       margin: 12px 0;
     }
 
-    .unsupported-card .req-list {
+    .req-list {
       text-align: left;
       background: rgba(0,0,0,0.4);
       border-radius: 12px;
@@ -157,7 +155,7 @@
       box-shadow: 0 0 12px rgba(0,229,255,0.2);
     }
 
-    /* original app styles (unchanged but scoped inside #app) */
+    /* App styles (same as before, but scoped under #app) */
     #app header {
       display: flex;
       align-items: center;
@@ -530,20 +528,6 @@
       margin-top: 14px;
     }
 
-    #app .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 3px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      font-family: 'Syne', sans-serif;
-    }
-
-    #app .badge-cyan { background: rgba(0,229,255,0.12); color: var(--cyan); }
-    #app .badge-green { background: rgba(0,255,136,0.12); color: var(--green); }
-    #app .badge-red { background: rgba(255,61,87,0.12); color: var(--red); }
-
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -552,454 +536,497 @@
 </head>
 <body>
 
-  <!-- unsupported message (shown by default) -->
-  <div id="unsupported-container">
-    <div class="unsupported-card">
-      <div class="unsupported-icon">⚠️</div>
-      <h2>BROWSER NOT SUPPORTED</h2>
-      <p><strong>QUESTLOAD</strong> requires advanced USB access (WebUSB) and a secure context.</p>
-      <div class="req-list">
-        <li>WebUSB API support (Chrome / Edge / Chromium-based)</li>
-        <li>HTTPS or localhost (secure context)</li>
-        <li>Developer mode enabled on your Quest headset</li>
-      </div>
-      <div class="badge-browser">
-        <span class="browser-badge">✓ Google Chrome</span>
-        <span class="browser-badge">✓ Microsoft Edge</span>
-        <span class="browser-badge">✗ Firefox</span>
-        <span class="browser-badge">✗ Safari</span>
-      </div>
-      <p style="font-size:12px; margin-top:12px">Firefox and Safari do not implement WebUSB. <br>Please switch to <strong>Chrome, Edge, Brave, or Opera</strong> to sideload APK/OBB files directly.</p>
-      <button class="btn-refresh" id="retryBrowserBtn">⟳ TRY AGAIN (if browser changed)</button>
+<div id="unsupported-container">
+  <div class="unsupported-card">
+    <div class="unsupported-icon">⚠️</div>
+    <h2>BROWSER NOT SUPPORTED</h2>
+    <p><strong>QUESTLOAD</strong> requires advanced USB access (WebUSB) and a secure context.</p>
+    <div class="req-list">
+      <li>WebUSB API support (Chrome / Edge / Chromium-based)</li>
+      <li>HTTPS or localhost (secure context)</li>
+      <li>Developer mode enabled on your Quest headset</li>
     </div>
+    <div class="badge-browser">
+      <span class="browser-badge">✓ Google Chrome</span>
+      <span class="browser-badge">✓ Microsoft Edge</span>
+      <span class="browser-badge">✗ Firefox</span>
+      <span class="browser-badge">✗ Safari</span>
+    </div>
+    <p style="font-size:12px; margin-top:12px">Firefox and Safari do not implement WebUSB. <br>Please switch to <strong>Chrome, Edge, Brave, or Opera</strong> to sideload APK/OBB files directly.</p>
+    <button class="btn-refresh" id="retryBrowserBtn">⟳ TRY AGAIN (if browser changed)</button>
   </div>
+</div>
 
-  <!-- full application (hidden until browser validation) -->
-  <div id="app">
-    <header>
-      <div class="logo">QUEST<span>LOAD</span></div>
-      <div class="status-bar">
-        <div class="status-dot" id="statusDot"></div>
-        <span id="statusText">NOT CONNECTED</span>
-      </div>
-    </header>
+<div id="app">
+  <header>
+    <div class="logo">QUEST<span>LOAD</span></div>
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">NOT CONNECTED</span>
+    </div>
+  </header>
 
-    <main>
-      <!-- CONNECT CARD -->
-      <div class="card connect-card">
-        <div class="card-label">01 / Device</div>
-        <div class="connect-inner">
-          <div class="connect-info">
-            <div class="card-title">Connect Your Headset</div>
-            <div class="card-sub">Connect your Quest via USB. Uses WebUSB + ADB — no drivers, no software needed.<br>
-              Put the headset on after connecting and accept the <em>"Allow USB Debugging"</em> prompt.</div>
-            <div class="device-name" id="deviceName">—</div>
-          </div>
-          <div style="display:flex;gap:10px;flex-shrink:0">
-            <button class="btn btn-cyan" id="btnConnect" onclick="connectDevice()">
-              <span>⬡</span> Connect Device
-            </button>
-            <button class="btn btn-red" id="btnDisconnect" onclick="disconnectDevice()" disabled>
-              Disconnect
-            </button>
-          </div>
+  <main>
+    <div class="card connect-card">
+      <div class="card-label">01 / Device</div>
+      <div class="connect-inner">
+        <div class="connect-info">
+          <div class="card-title">Connect Your Headset</div>
+          <div class="card-sub">Connect your Quest via USB. Uses WebUSB + ADB — no drivers, no software needed.<br>
+            Put the headset on after connecting and accept the <em>"Allow USB Debugging"</em> prompt.</div>
+          <div class="device-name" id="deviceName">—</div>
         </div>
-        <div class="prereqs">
-          <div class="prereq"><span class="prereq-num">01</span><div class="prereq-text"><strong>Developer Mode</strong> — enable in the Meta app on your phone under headset settings → developer mode</div></div>
-          <div class="prereq"><span class="prereq-num">02</span><div class="prereq-text"><strong>USB Cable</strong> — plug headset into PC/Mac. Use a data cable, not charge-only</div></div>
-          <div class="prereq"><span class="prereq-num">03</span><div class="prereq-text"><strong>Allow Debugging</strong> — put headset on and tap <em>Allow</em> on the USB debugging prompt</div></div>
+        <div style="display:flex;gap:10px;flex-shrink:0">
+          <button class="btn btn-cyan" id="btnConnect">⬡ Connect Device</button>
+          <button class="btn btn-red" id="btnDisconnect" disabled>Disconnect</button>
         </div>
       </div>
-
-      <!-- APK INSTALL -->
-      <div class="card">
-        <div class="card-label">02 / APK Install</div>
-        <div class="card-title">Install APK</div>
-        <div class="card-sub">Select a .apk file. It will be pushed to the device and installed automatically.</div>
-        <div class="dropzone" id="apkDrop">
-          <input type="file" id="apkFile" accept=".apk" onchange="handleApkSelect(this)">
-          <span class="dropzone-icon">📦</span>
-          <div class="dropzone-title">Drop APK here</div>
-          <div class="dropzone-hint">or click to browse — .apk files only</div>
-        </div>
-        <div class="file-selected" id="apkName" style="display:none"></div>
-        <div class="progress-wrap" id="apkProgress">
-          <div class="progress-label">
-            <span id="apkProgressLabel">Pushing…</span>
-            <span id="apkProgressPct">0%</span>
-          </div>
-          <div class="progress-track"><div class="progress-bar" id="apkProgressBar"></div></div>
-        </div>
-        <div class="action-row">
-          <button class="btn btn-green btn-full" id="btnInstall" onclick="installApk()" disabled>
-            ▶ Install APK
-          </button>
-        </div>
+      <div class="prereqs">
+        <div class="prereq"><span class="prereq-num">01</span><div class="prereq-text"><strong>Developer Mode</strong> — enable in the Meta app on your phone under headset settings → developer mode</div></div>
+        <div class="prereq"><span class="prereq-num">02</span><div class="prereq-text"><strong>USB Cable</strong> — plug headset into PC/Mac. Use a data cable, not charge-only</div></div>
+        <div class="prereq"><span class="prereq-num">03</span><div class="prereq-text"><strong>Allow Debugging</strong> — put headset on and tap <em>Allow</em> on the USB debugging prompt</div></div>
       </div>
+    </div>
 
-      <!-- OBB PUSH -->
-      <div class="card">
-        <div class="card-label">03 / OBB Files</div>
-        <div class="card-title">Push OBB Folder</div>
-        <div class="card-sub">Select the OBB folder for your game. Files will be pushed to <code>/sdcard/Android/obb/</code></div>
-        <div class="field-row">
-          <label class="field-label">DESTINATION PATH (auto-detected or edit manually)</label>
-          <input class="field-input" type="text" id="obbPath"
-            placeholder="/sdcard/Android/obb/com.yourapp.name/" value="/sdcard/Android/obb/">
-        </div>
-        <div class="dropzone" id="obbDrop">
-          <input type="file" id="obbFolder" webkitdirectory multiple onchange="handleObbSelect(this)">
-          <span class="dropzone-icon">📁</span>
-          <div class="dropzone-title">Select OBB folder</div>
-          <div class="dropzone-hint">Click to choose folder — entire directory is pushed</div>
-        </div>
-        <div class="file-selected" id="obbInfo" style="display:none"></div>
-        <div class="progress-wrap" id="obbProgress">
-          <div class="progress-label">
-            <span id="obbProgressLabel">Pushing…</span>
-            <span id="obbProgressPct">0%</span>
-          </div>
-          <div class="progress-track"><div class="progress-bar" id="obbProgressBar"></div></div>
-        </div>
-        <div class="action-row">
-          <button class="btn btn-green btn-full" id="btnPushObb" onclick="pushObb()" disabled>
-            ▶ Push OBB Files
-          </button>
-        </div>
+    <div class="card">
+      <div class="card-label">02 / APK Install</div>
+      <div class="card-title">Install APK</div>
+      <div class="card-sub">Select a .apk file. It will be pushed to the device and installed automatically.</div>
+      <div class="dropzone" id="apkDrop">
+        <input type="file" id="apkFile" accept=".apk">
+        <span class="dropzone-icon">📦</span>
+        <div class="dropzone-title">Drop APK here</div>
+        <div class="dropzone-hint">or click to browse — .apk files only</div>
       </div>
-
-      <!-- CONSOLE -->
-      <div class="card console-card">
-        <div class="console-header">
-          <div class="card-label" style="margin:0">Console Output</div>
-          <button class="btn btn-red" style="padding:4px 12px;font-size:11px" onclick="clearConsole()">Clear</button>
+      <div class="file-selected" id="apkName" style="display:none"></div>
+      <div class="progress-wrap" id="apkProgress">
+        <div class="progress-label">
+          <span id="apkProgressLabel">Pushing…</span>
+          <span id="apkProgressPct">0%</span>
         </div>
-        <div class="console" id="console"></div>
+        <div class="progress-track"><div class="progress-bar" id="apkProgressBar"></div></div>
       </div>
-    </main>
-  </div>
+      <div class="action-row">
+        <button class="btn btn-green btn-full" id="btnInstall" disabled>▶ Install APK</button>
+      </div>
+    </div>
 
-  <script type="module">
-    // ─────────────────────────────────────────────────────────────────
-    // BROWSER SUPPORT CHECK: WebUSB + Secure Context
-    // ─────────────────────────────────────────────────────────────────
-    const unsupportedDiv = document.getElementById('unsupported-container');
-    const appContainer = document.getElementById('app');
+    <div class="card">
+      <div class="card-label">03 / OBB Files</div>
+      <div class="card-title">Push OBB Folder</div>
+      <div class="card-sub">Select the OBB folder for your game. Files will be pushed to <code>/sdcard/Android/obb/</code></div>
+      <div class="field-row">
+        <label class="field-label">DESTINATION PATH (auto-detected or edit manually)</label>
+        <input class="field-input" type="text" id="obbPath" placeholder="/sdcard/Android/obb/com.yourapp.name/" value="/sdcard/Android/obb/">
+      </div>
+      <div class="dropzone" id="obbDrop">
+        <input type="file" id="obbFolder" webkitdirectory multiple>
+        <span class="dropzone-icon">📁</span>
+        <div class="dropzone-title">Select OBB folder</div>
+        <div class="dropzone-hint">Click to choose folder — entire directory is pushed</div>
+      </div>
+      <div class="file-selected" id="obbInfo" style="display:none"></div>
+      <div class="progress-wrap" id="obbProgress">
+        <div class="progress-label">
+          <span id="obbProgressLabel">Pushing…</span>
+          <span id="obbProgressPct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-bar" id="obbProgressBar"></div></div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-green btn-full" id="btnPushObb" disabled>▶ Push OBB Files</button>
+      </div>
+    </div>
 
-    function isBrowserSupported() {
-      // WebUSB mandatory + secure context (HTTPS or localhost)
-      return 'usb' in navigator && window.isSecureContext === true;
-    }
+    <div class="card console-card">
+      <div class="console-header">
+        <div class="card-label" style="margin:0">Console Output</div>
+        <button class="btn btn-red" id="clearConsoleBtn" style="padding:4px 12px;font-size:11px">Clear</button>
+      </div>
+      <div class="console" id="console"></div>
+    </div>
+  </main>
+</div>
 
-    function showUnsupported() {
-      if (unsupportedDiv) unsupportedDiv.style.display = 'flex';
-      if (appContainer) appContainer.style.display = 'none';
-    }
+<script type="module">
+  // ------------------------------------------------------------------
+  // 1. Browser capability check (WebUSB + secure context)
+  // ------------------------------------------------------------------
+  const unsupportedDiv = document.getElementById('unsupported-container');
+  const appContainer = document.getElementById('app');
 
-    function showApp() {
-      if (unsupportedDiv) unsupportedDiv.style.display = 'none';
-      if (appContainer) appContainer.style.display = 'block';
-      // additional tiny log to indicate ready
-      const consoleEl = document.getElementById('console');
-      if (consoleEl) {
-        const logLine = document.createElement('div');
-        logLine.className = 'log-line';
-        logLine.innerHTML = `<span class="log-ts">${new Date().toLocaleTimeString('en', { hour12: false })}</span><span class="log-success">✓ Browser supported — WebUSB ready. Connect your headset.</span>`;
-        consoleEl.appendChild(logLine);
+  function isBrowserSupported() {
+    return 'usb' in navigator && window.isSecureContext === true;
+  }
+
+  function showUnsupported() {
+    unsupportedDiv.style.display = 'flex';
+    appContainer.style.display = 'none';
+  }
+
+  function showApp() {
+    unsupportedDiv.style.display = 'none';
+    appContainer.style.display = 'block';
+  }
+
+  if (!isBrowserSupported()) {
+    showUnsupported();
+    // Add retry button handler
+    document.getElementById('retryBrowserBtn').addEventListener('click', () => {
+      if (isBrowserSupported()) {
+        location.reload(); // reload to re-run script
+      } else {
+        const note = document.createElement('p');
+        note.style.color = '#ffb300';
+        note.style.fontSize = '12px';
+        note.style.marginTop = '12px';
+        note.innerText = '❌ WebUSB still missing. Use Chrome/Edge or ensure HTTPS/localhost.';
+        document.querySelector('.unsupported-card').appendChild(note);
+        setTimeout(() => note.remove(), 3000);
       }
-    }
-
-    // retry button logic
-    const retryBtn = document.getElementById('retryBrowserBtn');
-    if (retryBtn) {
-      retryBtn.addEventListener('click', () => {
-        if (isBrowserSupported()) {
-          showApp();
-        } else {
-          // keep unsupported visible, maybe show temporary note
-          const note = document.createElement('p');
-          note.style.color = '#ffb300';
-          note.style.fontSize = '12px';
-          note.style.marginTop = '12px';
-          note.innerText = '❌ WebUSB still missing. Use Chrome/Edge or ensure HTTPS/localhost.';
-          document.querySelector('.unsupported-card').appendChild(note);
-          setTimeout(() => note.remove(), 3000);
-        }
-      });
-    }
-
-    // initial check
-    if (isBrowserSupported()) {
-      showApp();
-    } else {
-      showUnsupported();
-      // also add additional hint if secure context fails
-      if (!window.isSecureContext) {
-        const extraMsg = document.createElement('p');
-        extraMsg.style.marginTop = '8px';
-        extraMsg.style.fontSize = '11px';
-        extraMsg.style.color = '#ffb300';
-        extraMsg.innerHTML = '🔒 Not a secure context — load over HTTPS or localhost.';
-        document.querySelector('.unsupported-card .req-list').after(extraMsg);
-      }
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    //  FULL QUESTLOAD LOGIC (imports & handlers)
-    // ─────────────────────────────────────────────────────────────────
-    import { Adb } from 'https://esm.sh/@yume-chan/adb@0.0.24';
-    import { AdbWebUsbBackend } from 'https://esm.sh/@yume-chan/adb-backend-webusb@0.0.24';
-    import { AdbWebCredentialStore } from 'https://esm.sh/@yume-chan/adb-credential-web-crypto@0.0.24';
-
-    let adb = null;
-    let apkFile = null;
-    let obbFiles = [];
-
-    window.connectDevice = connectDevice;
-    window.disconnectDevice = disconnectDevice;
-    window.installApk = installApk;
-    window.pushObb = pushObb;
-    window.handleApkSelect = handleApkSelect;
-    window.handleObbSelect = handleObbSelect;
-    window.clearConsole = clearConsole;
-
-    function log(msg, type = 'info') {
-      const el = document.getElementById('console');
-      if (!el) return;
-      const ts = new Date().toLocaleTimeString('en', { hour12: false });
-      const line = document.createElement('div');
-      line.className = 'log-line';
-      line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${escapeHtml(msg)}</span>`;
-      el.appendChild(line);
-      el.scrollTop = el.scrollHeight;
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    function clearConsole() { const c = document.getElementById('console'); if(c) c.innerHTML = ''; }
-
-    function setStatus(state, text, deviceLabel = '') {
-      const dot = document.getElementById('statusDot');
-      const txt = document.getElementById('statusText');
-      const name = document.getElementById('deviceName');
-      if(dot) dot.className = `status-dot ${state}`;
-      if(txt) txt.textContent = text;
-      if(name) name.textContent = deviceLabel || '—';
-    }
-
-    function setConnected(connected) {
-      const btnConnect = document.getElementById('btnConnect');
-      const btnDisconnect = document.getElementById('btnDisconnect');
-      if(btnConnect) btnConnect.disabled = connected;
-      if(btnDisconnect) btnDisconnect.disabled = !connected;
-      updateInstallBtns();
-    }
-
-    function updateInstallBtns() {
-      const ok = !!adb;
-      const btnInstall = document.getElementById('btnInstall');
-      const btnPush = document.getElementById('btnPushObb');
-      if(btnInstall) btnInstall.disabled = !ok || !apkFile;
-      if(btnPush) btnPush.disabled = !ok || obbFiles.length === 0;
-    }
-
-    function handleApkSelect(input) {
-      const f = input.files[0];
-      if (!f) return;
-      if (!f.name.endsWith('.apk')) { log('Selected file is not an APK', 'error'); return; }
-      apkFile = f;
-      const el = document.getElementById('apkName');
-      if(el) { el.style.display = 'block'; el.textContent = `${f.name}  (${formatBytes(f.size)})`; }
-      log(`APK selected: ${f.name} (${formatBytes(f.size)})`, 'info');
-      updateInstallBtns();
-    }
-
-    function handleObbSelect(input) {
-      obbFiles = Array.from(input.files);
-      if (!obbFiles.length) return;
-      const firstObb = obbFiles.find(f => f.name.endsWith('.obb'));
-      if (firstObb) {
-        const parts = firstObb.name.split('.');
-        if (parts.length >= 4) {
-          const pkg = parts.slice(2, -1).join('.');
-          const pathInput = document.getElementById('obbPath');
-          if (pathInput && pathInput.value === '/sdcard/Android/obb/') {
-            pathInput.value = `/sdcard/Android/obb/${pkg}/`;
-            log(`Auto-detected package: ${pkg}`, 'info');
-          }
-        }
-      }
-      const totalSize = obbFiles.reduce((s, f) => s + f.size, 0);
-      const infoEl = document.getElementById('obbInfo');
-      if(infoEl) { infoEl.style.display = 'block'; infoEl.textContent = `${obbFiles.length} file(s) — ${formatBytes(totalSize)}`; }
-      log(`OBB folder selected: ${obbFiles.length} file(s), ${formatBytes(totalSize)}`, 'info');
-      updateInstallBtns();
-    }
-
-    async function connectDevice() {
-      if (!navigator.usb) { log('WebUSB not supported', 'error'); return; }
-      try {
-        setStatus('connecting', 'CONNECTING…');
-        log('Requesting USB device…');
-        const credentialStore = new AdbWebCredentialStore('QuestLoad');
-        const backend = await AdbWebUsbBackend.fromBrowser(undefined);
-        log('USB device selected. Connecting ADB…');
-        adb = new Adb(backend, 'QuestLoad', credentialStore);
-        await adb.connect();
-        const serial = adb.serial || 'quest';
-        setStatus('connected', 'CONNECTED', serial);
-        log(`Connected: ${serial}`, 'success');
-        try {
-          const model = await shellCommand('getprop ro.product.model');
-          log(`Device: ${model.trim()}`, 'success');
-        } catch {}
-        setConnected(true);
-      } catch (err) {
-        adb = null;
-        setStatus('', 'NOT CONNECTED');
-        log(`Connection failed: ${err.message || err}`, 'error');
-        log('Tip: Put on the headset and accept the USB debugging prompt', 'warn');
-        setConnected(false);
-      }
-    }
-
-    async function disconnectDevice() {
-      if (adb) { try { await adb.close(); } catch {} adb = null; }
-      setStatus('', 'NOT CONNECTED', '');
-      setConnected(false);
-      log('Disconnected', 'warn');
-    }
-
-    async function shellCommand(cmd) {
-      if (!adb) throw new Error('Not connected');
-      const output = await adb.subprocess.shell(cmd);
-      const reader = output.stdout.getReader();
-      let result = '';
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        result += new TextDecoder().decode(value);
-      }
-      return result;
-    }
-
-    async function pushFileToDevice(file, remotePath, onProgress) {
-      const CHUNK = 64 * 1024;
-      const sync = await adb.sync();
-      try {
-        const mtime = Math.floor(Date.now() / 1000);
-        const writable = sync.write(remotePath, 0o644, mtime);
-        const writer = writable.getWriter();
-        const buf = await file.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let offset = 0;
-        const total = bytes.length;
-        while (offset < total) {
-          const end = Math.min(offset + CHUNK, total);
-          const chunk = bytes.subarray(offset, end);
-          await writer.write(chunk);
-          offset = end;
-          if (onProgress) onProgress(offset, total);
-        }
-        await writer.close();
-      } finally {
-        await sync.dispose();
-      }
-    }
-
-    async function installApk() {
-      if (!adb || !apkFile) return;
-      const btn = document.getElementById('btnInstall');
-      if(btn) btn.disabled = true;
-      const progressWrap = document.getElementById('apkProgress');
-      const progressBar = document.getElementById('apkProgressBar');
-      const progressPct = document.getElementById('apkProgressPct');
-      const progressLbl = document.getElementById('apkProgressLabel');
-      const tmpPath = '/data/local/tmp/_questload_install.apk';
-      try {
-        if(progressWrap) progressWrap.classList.add('visible');
-        if(progressLbl) progressLbl.textContent = 'Pushing APK…';
-        await pushFileToDevice(apkFile, tmpPath, (done, total) => {
-          const pct = Math.round((done / total) * 100);
-          if(progressBar) progressBar.style.width = pct + '%';
-          if(progressPct) progressPct.textContent = pct + '%';
-        });
-        if(progressLbl) progressLbl.textContent = 'Installing…';
-        if(progressBar) progressBar.style.width = '100%';
-        const result = await shellCommand(`pm install -r "${tmpPath}"`);
-        log(`pm install: ${result.trim()}`, result.includes('Success') ? 'success' : 'error');
-        await shellCommand(`rm "${tmpPath}"`);
-        if (result.includes('Success')) log('✓ APK installed successfully!', 'success');
-        else log('Installation may have failed — check output above', 'warn');
-      } catch (err) {
-        log(`Install error: ${err.message || err}`, 'error');
-      } finally {
-        if(btn) btn.disabled = false;
-        setTimeout(() => { if(progressWrap) progressWrap.classList.remove('visible'); }, 3000);
-        updateInstallBtns();
-      }
-    }
-
-    async function pushObb() {
-      if (!adb || !obbFiles.length) return;
-      const btn = document.getElementById('btnPushObb');
-      if(btn) btn.disabled = true;
-      const destBase = document.getElementById('obbPath').value.replace(/\/?$/, '/');
-      const progressWrap = document.getElementById('obbProgress');
-      const progressBar = document.getElementById('obbProgressBar');
-      const progressPct = document.getElementById('obbProgressPct');
-      const progressLbl = document.getElementById('obbProgressLabel');
-      if(progressWrap) progressWrap.classList.add('visible');
-      try {
-        await shellCommand(`mkdir -p "${destBase}"`);
-        const total = obbFiles.length;
-        let done = 0;
-        for (const file of obbFiles) {
-          const rel = file.webkitRelativePath || file.name;
-          const parts = rel.split('/');
-          const subPath = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
-          const remotePath = destBase + subPath;
-          if (subPath.includes('/')) {
-            const dir = remotePath.substring(0, remotePath.lastIndexOf('/'));
-            await shellCommand(`mkdir -p "${dir}"`);
-          }
-          log(`Pushing [${done+1}/${total}] ${subPath} (${formatBytes(file.size)})`);
-          if(progressLbl) progressLbl.textContent = `Pushing ${subPath}…`;
-          await pushFileToDevice(file, remotePath, (sent, fileTotal) => {
-            const filePct = sent / fileTotal;
-            const overall = ((done + filePct) / total) * 100;
-            if(progressBar) progressBar.style.width = Math.round(overall) + '%';
-            if(progressPct) progressPct.textContent = Math.round(overall) + '%';
-          });
-          done++;
-          log(`✓ ${subPath}`, 'success');
-        }
-        log(`✓ All ${total} OBB file(s) pushed to ${destBase}`, 'success');
-      } catch (err) {
-        log(`OBB push error: ${err.message || err}`, 'error');
-      } finally {
-        if(btn) btn.disabled = false;
-        setTimeout(() => { if(progressWrap) progressWrap.classList.remove('visible'); }, 3000);
-        updateInstallBtns();
-      }
-    }
-
-    function formatBytes(b) {
-      if (b < 1024) return b + ' B';
-      if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-      if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
-      return (b / 1073741824).toFixed(2) + ' GB';
-    }
-
-    document.querySelectorAll('.dropzone').forEach(dz => {
-      dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-      dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-      dz.addEventListener('drop', () => dz.classList.remove('drag-over'));
     });
+    throw new Error('Browser not supported'); // stop execution
+  } else {
+    // browser supports WebUSB → try to load modules and show app
+    showApp(); // show empty app first (might show loading later)
+  }
 
-    if (isBrowserSupported()) log('QuestLoad ready. Connect your headset to begin.', 'info');
-  </script>
+  // ------------------------------------------------------------------
+  // 2. Dynamically import ADB modules (to catch failures)
+  // ------------------------------------------------------------------
+  let Adb, AdbWebUsbBackend, AdbWebCredentialStore;
+  try {
+    const adbModule = await import('https://esm.sh/@yume-chan/adb@0.0.24');
+    const backendModule = await import('https://esm.sh/@yume-chan/adb-backend-webusb@0.0.24');
+    const credModule = await import('https://esm.sh/@yume-chan/adb-credential-web-crypto@0.0.24');
+    Adb = adbModule.Adb;
+    AdbWebUsbBackend = backendModule.AdbWebUsbBackend;
+    AdbWebCredentialStore = credModule.AdbWebCredentialStore;
+  } catch (importError) {
+    console.error('Failed to load ADB modules:', importError);
+    // Show error inside unsupported container and hide app
+    const errorCard = document.querySelector('.unsupported-card');
+    errorCard.innerHTML += `<p style="color:#ff3d57; margin-top:16px;">⚠️ Failed to load core libraries. Check your internet connection and reload.</p>`;
+    showUnsupported();
+    throw importError;
+  }
+
+  // ------------------------------------------------------------------
+  // 3. Application state and logic
+  // ------------------------------------------------------------------
+  let adb = null;
+  let apkFile = null;
+  let obbFiles = [];
+
+  // Helper: log to console
+  function log(msg, type = 'info') {
+    const el = document.getElementById('console');
+    if (!el) return;
+    const ts = new Date().toLocaleTimeString('en', { hour12: false });
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${escapeHtml(msg)}</span>`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function clearConsole() {
+    const c = document.getElementById('console');
+    if (c) c.innerHTML = '';
+  }
+
+  function setStatus(state, text, deviceLabel = '') {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    const name = document.getElementById('deviceName');
+    if (dot) dot.className = `status-dot ${state}`;
+    if (txt) txt.textContent = text;
+    if (name) name.textContent = deviceLabel || '—';
+  }
+
+  function updateInstallBtns() {
+    const connected = !!adb;
+    const installBtn = document.getElementById('btnInstall');
+    const pushBtn = document.getElementById('btnPushObb');
+    if (installBtn) installBtn.disabled = !connected || !apkFile;
+    if (pushBtn) pushBtn.disabled = !connected || obbFiles.length === 0;
+  }
+
+  // File handlers
+  function handleApkSelect(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.apk')) {
+      log('Selected file is not an APK', 'error');
+      return;
+    }
+    apkFile = file;
+    const nameEl = document.getElementById('apkName');
+    nameEl.style.display = 'block';
+    nameEl.textContent = `${file.name} (${formatBytes(file.size)})`;
+    log(`APK selected: ${file.name} (${formatBytes(file.size)})`, 'info');
+    updateInstallBtns();
+  }
+
+  function handleObbSelect(files) {
+    obbFiles = Array.from(files);
+    if (!obbFiles.length) return;
+
+    // auto-detect package from first .obb file
+    const firstObb = obbFiles.find(f => f.name.endsWith('.obb'));
+    if (firstObb) {
+      const parts = firstObb.name.split('.');
+      if (parts.length >= 4) {
+        const pkg = parts.slice(2, -1).join('.');
+        const pathInput = document.getElementById('obbPath');
+        if (pathInput && pathInput.value === '/sdcard/Android/obb/') {
+          pathInput.value = `/sdcard/Android/obb/${pkg}/`;
+          log(`Auto-detected package: ${pkg}`, 'info');
+        }
+      }
+    }
+
+    const totalSize = obbFiles.reduce((s, f) => s + f.size, 0);
+    const infoEl = document.getElementById('obbInfo');
+    infoEl.style.display = 'block';
+    infoEl.textContent = `${obbFiles.length} file(s) — ${formatBytes(totalSize)}`;
+    log(`OBB folder selected: ${obbFiles.length} file(s), ${formatBytes(totalSize)}`, 'info');
+    updateInstallBtns();
+  }
+
+  // ADB operations
+  async function connectDevice() {
+    if (!navigator.usb) {
+      log('WebUSB not supported', 'error');
+      return;
+    }
+    try {
+      setStatus('connecting', 'CONNECTING…');
+      log('Requesting USB device…');
+
+      const credentialStore = new AdbWebCredentialStore('QuestLoad');
+      const backend = await AdbWebUsbBackend.fromBrowser(undefined);
+      log('USB device selected. Connecting ADB…');
+      adb = new Adb(backend, 'QuestLoad', credentialStore);
+      await adb.connect();
+
+      const serial = adb.serial || 'quest';
+      setStatus('connected', 'CONNECTED', serial);
+      log(`Connected: ${serial}`, 'success');
+
+      try {
+        const model = await shellCommand('getprop ro.product.model');
+        log(`Device: ${model.trim()}`, 'success');
+      } catch (e) {}
+
+      updateInstallBtns();
+      document.getElementById('btnConnect').disabled = true;
+      document.getElementById('btnDisconnect').disabled = false;
+    } catch (err) {
+      adb = null;
+      setStatus('', 'NOT CONNECTED');
+      log(`Connection failed: ${err.message || err}`, 'error');
+      log('Tip: Put on the headset and accept the USB debugging prompt', 'warn');
+      document.getElementById('btnConnect').disabled = false;
+      document.getElementById('btnDisconnect').disabled = true;
+      updateInstallBtns();
+    }
+  }
+
+  async function disconnectDevice() {
+    if (adb) {
+      try { await adb.close(); } catch (e) {}
+      adb = null;
+    }
+    setStatus('', 'NOT CONNECTED', '');
+    document.getElementById('btnConnect').disabled = false;
+    document.getElementById('btnDisconnect').disabled = true;
+    updateInstallBtns();
+    log('Disconnected', 'warn');
+  }
+
+  async function shellCommand(cmd) {
+    if (!adb) throw new Error('Not connected');
+    const output = await adb.subprocess.shell(cmd);
+    const reader = output.stdout.getReader();
+    let result = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      result += new TextDecoder().decode(value);
+    }
+    return result;
+  }
+
+  async function pushFileToDevice(file, remotePath, onProgress) {
+    const CHUNK = 64 * 1024;
+    const sync = await adb.sync();
+    try {
+      const mtime = Math.floor(Date.now() / 1000);
+      const writable = sync.write(remotePath, 0o644, mtime);
+      const writer = writable.getWriter();
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let offset = 0;
+      const total = bytes.length;
+      while (offset < total) {
+        const end = Math.min(offset + CHUNK, total);
+        const chunk = bytes.subarray(offset, end);
+        await writer.write(chunk);
+        offset = end;
+        if (onProgress) onProgress(offset, total);
+      }
+      await writer.close();
+    } finally {
+      await sync.dispose();
+    }
+  }
+
+  async function installApk() {
+    if (!adb || !apkFile) return;
+    const btn = document.getElementById('btnInstall');
+    btn.disabled = true;
+    const progressWrap = document.getElementById('apkProgress');
+    const progressBar = document.getElementById('apkProgressBar');
+    const progressPct = document.getElementById('apkProgressPct');
+    const progressLbl = document.getElementById('apkProgressLabel');
+    const tmpPath = '/data/local/tmp/_questload_install.apk';
+
+    try {
+      progressWrap.classList.add('visible');
+      progressLbl.textContent = 'Pushing APK…';
+      await pushFileToDevice(apkFile, tmpPath, (done, total) => {
+        const pct = Math.round((done / total) * 100);
+        progressBar.style.width = pct + '%';
+        progressPct.textContent = pct + '%';
+      });
+      progressLbl.textContent = 'Installing…';
+      progressBar.style.width = '100%';
+      const result = await shellCommand(`pm install -r "${tmpPath}"`);
+      log(`pm install: ${result.trim()}`, result.includes('Success') ? 'success' : 'error');
+      await shellCommand(`rm "${tmpPath}"`);
+      if (result.includes('Success')) log('✓ APK installed successfully!', 'success');
+      else log('Installation may have failed — check output above', 'warn');
+    } catch (err) {
+      log(`Install error: ${err.message || err}`, 'error');
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => progressWrap.classList.remove('visible'), 3000);
+      updateInstallBtns();
+    }
+  }
+
+  async function pushObb() {
+    if (!adb || !obbFiles.length) return;
+    const btn = document.getElementById('btnPushObb');
+    btn.disabled = true;
+    const destBase = document.getElementById('obbPath').value.replace(/\/?$/, '/');
+    const progressWrap = document.getElementById('obbProgress');
+    const progressBar = document.getElementById('obbProgressBar');
+    const progressPct = document.getElementById('obbProgressPct');
+    const progressLbl = document.getElementById('obbProgressLabel');
+    progressWrap.classList.add('visible');
+
+    try {
+      await shellCommand(`mkdir -p "${destBase}"`);
+      const total = obbFiles.length;
+      let done = 0;
+      for (const file of obbFiles) {
+        const rel = file.webkitRelativePath || file.name;
+        const parts = rel.split('/');
+        const subPath = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+        const remotePath = destBase + subPath;
+        if (subPath.includes('/')) {
+          const dir = remotePath.substring(0, remotePath.lastIndexOf('/'));
+          await shellCommand(`mkdir -p "${dir}"`);
+        }
+        log(`Pushing [${done+1}/${total}] ${subPath} (${formatBytes(file.size)})`);
+        progressLbl.textContent = `Pushing ${subPath}…`;
+        await pushFileToDevice(file, remotePath, (sent, fileTotal) => {
+          const filePct = sent / fileTotal;
+          const overall = ((done + filePct) / total) * 100;
+          progressBar.style.width = Math.round(overall) + '%';
+          progressPct.textContent = Math.round(overall) + '%';
+        });
+        done++;
+        log(`✓ ${subPath}`, 'success');
+      }
+      log(`✓ All ${total} OBB file(s) pushed to ${destBase}`, 'success');
+    } catch (err) {
+      log(`OBB push error: ${err.message || err}`, 'error');
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => progressWrap.classList.remove('visible'), 3000);
+      updateInstallBtns();
+    }
+  }
+
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+    return (b / 1073741824).toFixed(2) + ' GB';
+  }
+
+  // ------------------------------------------------------------------
+  // 4. Attach event listeners and initialize UI
+  // ------------------------------------------------------------------
+  // Buttons
+  document.getElementById('btnConnect').addEventListener('click', connectDevice);
+  document.getElementById('btnDisconnect').addEventListener('click', disconnectDevice);
+  document.getElementById('btnInstall').addEventListener('click', installApk);
+  document.getElementById('btnPushObb').addEventListener('click', pushObb);
+  document.getElementById('clearConsoleBtn').addEventListener('click', clearConsole);
+
+  // File inputs
+  const apkInput = document.getElementById('apkFile');
+  apkInput.addEventListener('change', (e) => handleApkSelect(e.target.files[0]));
+  const obbInput = document.getElementById('obbFolder');
+  obbInput.addEventListener('change', (e) => handleObbSelect(e.target.files));
+
+  // Drag & drop zones (optional enhancements)
+  const apkDropZone = document.getElementById('apkDrop');
+  apkDropZone.addEventListener('dragover', (e) => e.preventDefault());
+  apkDropZone.addEventListener('dragleave', () => apkDropZone.classList.remove('drag-over'));
+  apkDropZone.addEventListener('dragenter', () => apkDropZone.classList.add('drag-over'));
+  apkDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    apkDropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.apk')) {
+      handleApkSelect(file);
+      // Also update the input's file list for consistency
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      apkInput.files = dt.files;
+    } else {
+      log('Dropped file is not an APK', 'error');
+    }
+  });
+
+  const obbDropZone = document.getElementById('obbDrop');
+  obbDropZone.addEventListener('dragover', (e) => e.preventDefault());
+  obbDropZone.addEventListener('dragleave', () => obbDropZone.classList.remove('drag-over'));
+  obbDropZone.addEventListener('dragenter', () => obbDropZone.classList.add('drag-over'));
+  obbDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    obbDropZone.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) {
+      handleObbSelect(files);
+      // manually set input's files (webkitdirectory can't be set via DataTransfer, but user can still browse)
+      // we just update the UI
+    } else {
+      log('No files dropped', 'warn');
+    }
+  });
+
+  // initial log
+  log('QuestLoad ready. Connect your headset to begin.', 'info');
+  log('Browser is supported (WebUSB + secure context).', 'success');
+</script>
 </body>
 </html>
